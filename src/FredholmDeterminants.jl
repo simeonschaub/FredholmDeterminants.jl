@@ -7,14 +7,14 @@ using FastGaussQuadrature, SpecialFunctions, LinearAlgebra, Distributions,
 
 const nodes₁, weights₁ = let (x, w) = gausslegendre(20)
     @. w *= -40 / (x^2 + 2x - 3)
-    @. x = 20atanh((x + 1)/2)
+    @. x = 20atanh((x + 1) / 2)
     x, w
 end
 const α, β = 20, 0
 const nodes₂, weights₂ = let (x, w) = gaussjacobi(12, α, β)
     @. w /= (1 - x)^α * (1 + x)^β
     @. w *= -20 / (x^2 + 2x - 3)
-    @. x = 10atanh((x + 1)/2)
+    @. x = 10atanh((x + 1) / 2)
     x, w
 end
 
