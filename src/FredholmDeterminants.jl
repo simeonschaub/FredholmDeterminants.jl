@@ -12,6 +12,7 @@ const nodes, weights = let (x, w) = gaussjacobi(12, α, β)
     x, w
 end
 
+K₁(x, y) = airyai((x + y) / 2) / 2
 function K₂(x, y)
     if x == y
         return (airyaiprime(x))^2 - x * (airyai(x))^2
@@ -21,34 +22,39 @@ function K₂(x, y)
 end
 
 fredholm_det(K, x, w) = det(I - .√w .* K.(x, x') .* .√(w'))
-fredholm_logdet(K, x, w) = logdet(I - .√w .* K.(x, x') .* .√(w'))
 
 struct TracyWidom{β} <: ContinuousUnivariateDistribution end
 
 function Distributions.cdf(::TracyWidom{β}, s::Float64) where {β}
-    if β == 2
-        return fredholm_det((x, y) -> K₂(s + x, s + y), nodes, weights)
+    if β == 1
+        K = K₁
+    elseif β == 2
+        K = K₂
     else
         throw(ArgumentError("β = $β not implemented"))
     end
+    return fredholm_det((x, y) -> K(s + x, s + y), nodes, weights)
 end
 
 function Distributions.logpdf(::TracyWidom{β}, s::Float64) where {β}
-    if β == 2
-        x, w = nodes, weights
-        Kₛ, dKₛ = DifferentiationInterface.value_and_derivative(AutoForwardDiff(), s) do s
-            .√w .* K₂.(s .+ x, s .+ x') .* .√(w')
-        end
-        A = I - Kₛ
-        _logdet, sgn = logabsdet(A)
-        sgn == -1 && return -Inf
-        _tr = -tr(A \ dKₛ)
-        _tr < 0 && return -Inf
-        return _logdet + log(_tr)
-        # return logdet(A) + log(-tr(A \ dKₛ), 0)
+    if β == 1
+        K = K₁
+    elseif β == 2
+        K = K₂
     else
         throw(ArgumentError("β = $β not implemented"))
     end
+    x, w = nodes, weights
+    Kₛ, dKₛ = DifferentiationInterface.value_and_derivative(AutoForwardDiff(), s) do s
+        .√w .* K.(s .+ x, s .+ x') .* .√(w')
+    end
+    A = I - Kₛ
+    _logdet, sgn = logabsdet(A)
+    sgn == -1 && return -Inf
+    _tr = -tr(A \ dKₛ)
+    _tr < 0 && return -Inf
+    return _logdet + log(_tr)
+    # return logdet(A) + log(-tr(A \ dKₛ), 0)
 end
 
 end
