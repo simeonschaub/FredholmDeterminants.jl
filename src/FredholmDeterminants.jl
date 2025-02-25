@@ -2,7 +2,8 @@ module FredholmDeterminants
 
 export TracyWidom
 
-using FastGaussQuadrature, SpecialFunctions, LinearAlgebra, Distributions, ForwardDiff, DifferentiationInterface
+using FastGaussQuadrature, SpecialFunctions, LinearAlgebra, Distributions,
+    ForwardDiff, DifferentiationInterface, LogExpFunctions
 
 const nodes₁, weights₁ = let (x, w) = gausslegendre(20)
     @. w *= -40 / (x^2 + 2x - 3)
@@ -30,36 +31,65 @@ fredholm_det(K, x, w) = det(I - .√w .* K.(x, x') .* .√(w'))
 
 struct TracyWidom{β} <: ContinuousUnivariateDistribution end
 
-function Distributions.cdf(::TracyWidom{β}, s::Float64) where {β}
+function Distributions.cdf(::TracyWidom{β}, s) where {β}
     if β == 1
         return fredholm_det((x, y) -> K₁(s + x, s + y), nodes₁, weights₁)
     elseif β == 2
         return fredholm_det((x, y) -> K₂(s + x, s + y), nodes₂, weights₂)
+    elseif β == 4
+        F₁, F₂ = cdf(TracyWidom{1}(), √2 * s), cdf(TracyWidom{2}(), √2 * s)
+        return (F₁ + F₂ / F₁) / 2
     else
         throw(ArgumentError("β = $β not implemented"))
     end
 end
 
-function Distributions.logpdf(::TracyWidom{β}, s::Float64) where {β}
-    if β == 1
-        K = K₁
-        x, w = nodes₁, weights₁
-    elseif β == 2
-        K = K₂
-        x, w = nodes₂, weights₂
-    else
-        throw(ArgumentError("β = $β not implemented"))
-    end
+function Kₛ_pushforward(K, s, x, w)
     Kₛ, dKₛ = DifferentiationInterface.value_and_derivative(AutoForwardDiff(), s) do s
         .√w .* K.(s .+ x, s .+ x') .* .√(w')
     end
+    return Kₛ, dKₛ
+end
+function _logpdf(Kₛ, dKₛ)
     A = I - Kₛ
     _logdet, sgn = logabsdet(A)
     sgn == -1 && return -Inf
     _tr = -tr(A \ dKₛ)
     _tr < 0 && return -Inf
     return _logdet + log(_tr)
-    # return logdet(A) + log(-tr(A \ dKₛ), 0)
+end
+
+function Distributions.logpdf(::TracyWidom{β}, s) where {β}
+    if β == 1
+        K = K₁
+        x, w = nodes₁, weights₁
+    elseif β == 2
+        K = K₂
+        x, w = nodes₂, weights₂
+    elseif β == 4
+        Kₛ₁, dKₛ₁ = Kₛ_pushforward(K₁, √2 * s, nodes₁, weights₁)
+        A₁ = I - Kₛ₁
+        _logdet₁, sgn = logabsdet(A₁)
+        sgn == -1 && return -Inf
+        _tr₁ = -√2 * tr(A₁ \ dKₛ₁)
+        _tr₁ < 0 && return -Inf
+
+        Kₛ₂, dKₛ₂ = Kₛ_pushforward(K₂, √2 * s, nodes₂, weights₂)
+        A₂ = I - Kₛ₂
+        _logdet₂, sgn = logabsdet(A₂)
+        sgn == -1 && return -Inf
+        _tr₂ = -√2 * tr(A₂ \ dKₛ₂)
+        _tr₂ < 0 && return -Inf
+
+        return logsubexp(
+            _logdet₂ + log(_tr₂) - _logdet₁,
+            _logdet₁ + log(_tr₁) + logexpm1(_logdet₂ - 2_logdet₁),
+        ) - log(2)
+    else
+        throw(ArgumentError("β = $β not implemented"))
+    end
+    Kₛ, dKₛ = Kₛ_pushforward(K, s, x, w)
+    return _logpdf(Kₛ, dKₛ)
 end
 
 end
