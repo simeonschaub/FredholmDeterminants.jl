@@ -33,6 +33,7 @@ struct TracyWidom{β} <: ContinuousUnivariateDistribution end
 
 function Distributions.cdf(::TracyWidom{β}, s) where {β}
     if β == 1
+        s < -20 && return zero(s)
         return fredholm_det((x, y) -> K₁(s + x, s + y), nodes₁, weights₁)
     elseif β == 2
         return fredholm_det((x, y) -> K₂(s + x, s + y), nodes₂, weights₂)
@@ -50,36 +51,28 @@ function Kₛ_pushforward(K, s, x, w)
     end
     return Kₛ, dKₛ
 end
-function _logpdf(Kₛ, dKₛ)
-    A = I - Kₛ
-    _logdet, sgn = logabsdet(A)
-    sgn == -1 && return -Inf
-    _tr = -tr(A \ dKₛ)
-    _tr < 0 && return -Inf
-    return _logdet + log(_tr)
-end
 
 function Distributions.logpdf(::TracyWidom{β}, s) where {β}
     if β == 1
+        s < -9.4 && return oftype(s, -Inf)
         K = K₁
         x, w = nodes₁, weights₁
     elseif β == 2
+        s < -8.55 && return oftype(s, -Inf)
         K = K₂
         x, w = nodes₂, weights₂
     elseif β == 4
+        s < -6.05 && return oftype(s, -Inf)
+
         Kₛ₁, dKₛ₁ = Kₛ_pushforward(K₁, √2 * s, nodes₁, weights₁)
         A₁ = I - Kₛ₁
-        _logdet₁, sgn = logabsdet(A₁)
-        sgn == -1 && return -Inf
+        _logdet₁ = logdet(A₁)
         _tr₁ = -√2 * tr(A₁ \ dKₛ₁)
-        _tr₁ < 0 && return -Inf
 
         Kₛ₂, dKₛ₂ = Kₛ_pushforward(K₂, √2 * s, nodes₂, weights₂)
         A₂ = I - Kₛ₂
-        _logdet₂, sgn = logabsdet(A₂)
-        sgn == -1 && return -Inf
+        _logdet₂ = logdet(A₂)
         _tr₂ = -√2 * tr(A₂ \ dKₛ₂)
-        _tr₂ < 0 && return -Inf
 
         return logsubexp(
             _logdet₂ + log(_tr₂) - _logdet₁,
@@ -89,7 +82,8 @@ function Distributions.logpdf(::TracyWidom{β}, s) where {β}
         throw(ArgumentError("β = $β not implemented"))
     end
     Kₛ, dKₛ = Kₛ_pushforward(K, s, x, w)
-    return _logpdf(Kₛ, dKₛ)
+    A = I - Kₛ
+    return logdet(A) + log(-tr(A \ dKₛ))
 end
 
 end
