@@ -31,7 +31,7 @@ fredholm_det(K, x, w) = det(I - Symmetric(.√w .* K.(x, x') .* .√(w')))
 
 struct TracyWidom{β} <: ContinuousUnivariateDistribution end
 
-function Distributions.cdf(::TracyWidom{β}, s) where {β}
+function Distributions.cdf(::TracyWidom{β}, s::Real) where {β}
     if β == 1
         s < -20 && return zero(s)
         return fredholm_det((x, y) -> K₁(s + x, s + y), nodes₁, weights₁)
@@ -52,13 +52,12 @@ function Kₛ_pushforward(K, s, x, w)
     return Symmetric(Kₛ), Symmetric(dKₛ)
 end
 
-function Distributions.logpdf(::TracyWidom{β}, s) where {β}
+function _logpdf(::TracyWidom{β}, s::Real) where {β}
     if β == 1
         s < -9.4 && return oftype(s, -Inf)
         K = K₁
         x, w = nodes₁, weights₁
     elseif β == 2
-        s < -8.55 && return oftype(s, -Inf)
         K = K₂
         x, w = nodes₂, weights₂
     elseif β == 4
@@ -84,6 +83,29 @@ function Distributions.logpdf(::TracyWidom{β}, s) where {β}
     Kₛ, dKₛ = Kₛ_pushforward(K, s, x, w)
     A = I - Kₛ
     return logdet(A) + log(-tr(A \ dKₛ))
+end
+
+logpdf⁻(s, β) = -β / 24 * abs(s)^3
+const s⁻ = (-Inf, -7.0, nothing, -Inf)
+const Z⁻ = map(enumerate(s⁻)) do (β, s⁻)
+    (s⁻ === nothing || !isfinite(s⁻)) && return s⁻
+    logpdf⁻(s⁻, β) - _logpdf(TracyWidom{β}(), s⁻)
+end
+
+logpdf⁺(s, β) = -2 / 3 * β * abs(s)^(3 / 2)
+const s⁺ = (100.0, 60.0, nothing, Inf)
+const Z⁺ = map(enumerate(s⁺)) do (β, s⁺)
+    (s⁺ === nothing || !isfinite(s⁺)) && return s⁺
+    logpdf⁺(s⁺, β) - _logpdf(TracyWidom{β}(), s⁺)
+end
+
+function Distributions.logpdf(::TracyWidom{β}, s::Real) where {β}
+    if s < s⁻[β]
+        return logpdf⁻(s, β) - Z⁻[β]
+    elseif s > s⁺[β]
+        return logpdf⁺(s, β) - Z⁺[β]
+    end
+    return _logpdf(TracyWidom{β}(), s)
 end
 
 end
