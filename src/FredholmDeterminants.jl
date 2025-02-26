@@ -27,7 +27,7 @@ function K₂(x, y)
     end
 end
 
-fredholm_det(K, x, w) = det(I - .√w .* K.(x, x') .* .√(w'))
+fredholm_det(K, x, w) = det(I - Symmetric(.√w .* K.(x, x') .* .√(w')))
 
 struct TracyWidom{β} <: ContinuousUnivariateDistribution end
 
@@ -49,7 +49,7 @@ function Kₛ_pushforward(K, s, x, w)
     Kₛ, dKₛ = DifferentiationInterface.value_and_derivative(AutoForwardDiff(), s) do s
         .√w .* K.(s .+ x, s .+ x') .* .√(w')
     end
-    return Kₛ, dKₛ
+    return Symmetric(Kₛ), Symmetric(dKₛ)
 end
 
 function Distributions.logpdf(::TracyWidom{β}, s) where {β}
