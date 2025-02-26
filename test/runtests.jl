@@ -23,7 +23,7 @@ end
 
 @testitem "β = 2" begin
     using Distributions, QuadGK
-    β, μ₀, σ²₀ = 2, −1.771086807411, 0.8131947928329
+    β, μ₀, σ²₀ = 2, -1.771086807411, 0.8131947928329
 
     μ, _ = quadgk(x -> x * pdf(TracyWidom{β}(), x), -Inf, Inf)
     @test μ ≈ μ₀ rtol = 4e-13
@@ -42,7 +42,7 @@ end
 
 @testitem "β = 4" begin
     using Distributions, QuadGK
-    β, μ₀, σ²₀ = 4, −2.306884893241, 0.5177237207726
+    β, μ₀, σ²₀ = 4, -2.306884893241, 0.5177237207726
 
     μ, _ = quadgk(x -> x * pdf(TracyWidom{β}(), x), -Inf, Inf)
     @test μ ≈ μ₀ rtol = 7e-9
