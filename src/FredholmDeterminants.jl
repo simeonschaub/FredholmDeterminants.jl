@@ -54,15 +54,12 @@ end
 
 function _logpdf(::TracyWidom{β}, s::Real) where {β}
     if β == 1
-        s < -9.4 && return oftype(s, -Inf)
         K = K₁
         x, w = nodes₁, weights₁
     elseif β == 2
         K = K₂
         x, w = nodes₂, weights₂
     elseif β == 4
-        s < -6.05 && return oftype(s, -Inf)
-
         Kₛ₁, dKₛ₁ = Kₛ_pushforward(K₁, √2 * s, nodes₁, weights₁)
         A₁ = I - Kₛ₁
         _logdet₁ = logdet(A₁)
@@ -85,16 +82,18 @@ function _logpdf(::TracyWidom{β}, s::Real) where {β}
     return logdet(A) + log(-tr(A \ dKₛ))
 end
 
-logpdf⁻(s, β) = -β / 24 * abs(s)^3
-const s⁻ = (-Inf, -7.0, nothing, -Inf)
-const Z⁻ = map(enumerate(s⁻)) do (β, s⁻)
+logpdf⁻(s, β) = (β^2 + 4 - 6β) / 16β * log(abs(s)) - β / 24 * abs(s)^3 + √2 * (β - 2) / 6 * abs(s)^(3 / 2)
+const s⁻ = (-9.0, -7.0, nothing, -Inf)
+const Z⁻ = ntuple(4) do β
+    s⁻ = FredholmDeterminants.s⁻[β]
     (s⁻ === nothing || !isfinite(s⁻)) && return s⁻
     logpdf⁻(s⁻, β) - _logpdf(TracyWidom{β}(), s⁻)
 end
 
 logpdf⁺(s, β) = -2 / 3 * β * abs(s)^(3 / 2)
 const s⁺ = (100.0, 60.0, nothing, Inf)
-const Z⁺ = map(enumerate(s⁺)) do (β, s⁺)
+const Z⁺ = ntuple(4) do β
+    s⁺ = FredholmDeterminants.s⁺[β]
     (s⁺ === nothing || !isfinite(s⁺)) && return s⁺
     logpdf⁺(s⁺, β) - _logpdf(TracyWidom{β}(), s⁺)
 end
